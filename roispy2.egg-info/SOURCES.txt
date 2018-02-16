@@ -1,0 +1,9 @@
+README.md
+roispy2/__init__.py
+roispy2/_rois.py
+roispy2/_utils.py
+roispy2.egg-info/PKG-INFO
+roispy2.egg-info/SOURCES.txt
+roispy2.egg-info/dependency_links.txt
+roispy2.egg-info/requires.txt
+roispy2.egg-info/top_level.txt
