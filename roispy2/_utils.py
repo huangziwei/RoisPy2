@@ -48,12 +48,17 @@ def get_logger(loglevel):
 
 def get_data_paths(rootdir, experimenter, expdate, expnum):
 
-    imaging_data_dir = rootdir + '/' + experimenter + '/' + expdate + '/' + str(expnum) + '/Pre/'
-    morph_data_dir = rootdir + '/' + experimenter + '/' + expdate + '/' + str(expnum) + '/Raw/'
+    exproot = rootdir + '/' + experimenter + '/' + expdate + '/' + str(expnum) + '/'
+    imaging_data_dir = exproot + 'Pre/'
+    morph_data_dir = exproot + 'Raw/'
 
     noise_h5_paths = []
     chirp_h5_paths = []
     lchirp_h5_paths = []
+
+    for file in os.listdir(exproot):
+        if ('.ini' in file.lower()):
+            headerfile_path = exproot + file
 
     for file in os.listdir(morph_data_dir):
         if ('.swc' in file.lower()):
@@ -142,6 +147,12 @@ def get_data_paths(rootdir, experimenter, expdate, expnum):
         stack_h5_path = None
         logging.info('  stack_h5_path: \n\t\t{} \n')
 
+    try:
+        logging.info('  headerfile_path: \n\t\t{} \n'.format(headerfile_path.split('/')[-1]))
+    except UnboundLocalError:
+        stack_h5_path = None
+        logging.info('  headerfile_path: \n\t\t{} \n')
+
     data_dict = {
 
         "imaging_data_dir": imaging_data_dir,
@@ -155,7 +166,9 @@ def get_data_paths(rootdir, experimenter, expdate, expnum):
         "chirp_h5_paths": chirp_h5_paths,
         "lchirp_h5_paths": lchirp_h5_paths,
 
-        "swc_path": swc_path
+        "swc_path": swc_path,
+
+        "headerfile": headerfile_path,
     }
     
     logging.info('  Finished reading data paths.\n')
@@ -359,3 +372,23 @@ def get_euclidean_distance_to_soma(roi_pos, soma_pos):
     
     return np.sqrt(np.sum((roi_pos -soma_pos) ** 2))
 
+
+def get_density_center(df_paths, soma, Z):    
+    
+    from scipy.ndimage.measurements import center_of_mass
+    def change_coordinate(coords, origin_size, new_size):
+
+        coords_new = np.array(coords) * (max(new_size) - min(new_size)) / max(origin_size) - max(new_size) 
+
+        return coords_new
+
+    xy = np.vstack(df_paths.path)[:, :2] - soma[:2]
+    lim_max = int(np.ceil((xy.T).max() / 20) * 20)
+    lim_min = int(np.floor((xy.T).min() / 20) * 20)
+    lim = max(abs(lim_max), abs(lim_min))
+
+    density_center = center_of_mass(Z)[::-1]
+    density_center = change_coordinate(density_center, (0, max(Z.shape)), (-lim, lim))
+    density_center += soma[:2]
+    
+    return density_center

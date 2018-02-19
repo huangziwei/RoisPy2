@@ -1,1 +1,1 @@
-from ._rois import RoiCheck
+from ._rois import ROIs
