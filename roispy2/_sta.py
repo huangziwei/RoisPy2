@@ -78,6 +78,8 @@ def standardize_data(data):
 
 def get_contour(data, threshold=3):
     
+    data = standardize_data(data)
+
     x, y = np.mgrid[:data.shape[0], :data.shape[1]]
     c = cntr.Cntr(x,y, data)
     
@@ -90,6 +92,7 @@ def get_contour(data, threshold=3):
         rf_size_list = []
         for i in range(int(len(res)/ 2)):
             rf_cntr = res[i]
+
             rf_size = cv2.contourArea(rf_cntr.astype(np.float32))
             rf_size_list.append(rf_size)
             

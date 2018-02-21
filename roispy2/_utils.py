@@ -9,6 +9,7 @@ import networkx as nx
 from copy import deepcopy
 
 from skimage.feature import match_template
+from shapely.geometry import Polygon
 
 def get_logger(loglevel):
 
@@ -392,3 +393,53 @@ def get_density_center(df_paths, soma, Z):
     density_center += soma[:2]
     
     return density_center
+
+
+# helpers for pariwise
+
+def unit_vector(v):
+    return v / np.linalg.norm(v)
+
+def angle_btw_node(roi_0_pos, roi_1_pos, node):
+    
+    v0 = unit_vector(roi_0_pos - node)
+    v1 = unit_vector(roi_1_pos - node)
+    
+    return np.degrees(np.arccos(np.clip(np.dot(v0, v1), -1.0, 1.0)))
+    
+
+def get_cntr_interception(cntr0, cntr1):
+    
+    if cntr0.shape[0] > cntr1.shape[0]:
+        sCntr = cntr1.copy()
+        bCntr = cntr0.copy()
+    else:
+        sCntr = cntr0.copy()
+        bCntr = cntr1.copy()
+    
+    sCntrPoly = Polygon(sCntr)
+    bCntrPoly = Polygon(bCntr)
+    
+    sCntr_area = sCntrPoly.area
+    bCntr_area = bCntrPoly.area
+    
+    check_intercept =  sCntrPoly.intersects(bCntrPoly)
+    
+    if check_intercept:
+        
+        CntrInpt = sCntrPoly.intersection(bCntrPoly)
+        
+        if CntrInpt.type == 'Polygon':
+            inner_cntr_list = [np.asarray(CntrInpt.boundary.coords)]
+            overlap_area = CntrInpt.area
+        elif CntrInpt.type == 'MultiPolygon':
+            inner_cntr_list = []
+            overlap_area = 0
+            for i in np.arange(len(CntrInpt.geoms)):
+                inner_cntr_list.append(np.asarray(CntrInpt.geoms[i].boundary.coords))
+                overlap_area += CntrInpt.geoms[i].area
+    else:
+        inner_cntr_list = [np.nan]
+        overlap_area = 0
+        
+    return inner_cntr_list, sCntr_area/1000, bCntr_area/1000, overlap_area/1000, overlap_area/sCntr_area
