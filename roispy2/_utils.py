@@ -30,21 +30,25 @@ def get_logger(loglevel):
 
     logger = logging.getLogger()
 
-    LEVELS = {'debug': logging.DEBUG,
-              'info': logging.INFO,
-              'warning': logging.WARNING,
-              'error': logging.ERROR,
-              'critical': logging.CRITICAL}
+    if loglevel is not None:
 
-    try:
-        LEVEL = LEVELS[loglevel]
-        logger.setLevel(LEVEL)
-    except ValueError:
-        logger.setLevel(logging.INFO)
-        logging.info('  Please enter a valid logging mode (DEBUG, INFO, WARNING, ERROR, CRITICAL).')
-        logger.setLevel(logging.ERROR)
+        LEVELS = {'debug': logging.DEBUG,
+                  'info': logging.INFO,
+                  'warning': logging.WARNING,
+                  'error': logging.ERROR,
+                  'critical': logging.CRITICAL}
 
-    return logger
+        try:
+            LEVEL = LEVELS[loglevel]
+            logger.setLevel(LEVEL)
+        except ValueError:
+            logger.setLevel(logging.INFO)
+            logging.info('  Please enter a valid logging mode (DEBUG, INFO, WARNING, ERROR, CRITICAL).')
+            logger.setLevel(logging.ERROR)
+
+        return logger
+    else:
+        return None
 
 
 def get_data_paths(rootdir, experimenter, expdate, expnum):

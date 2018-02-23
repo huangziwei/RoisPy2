@@ -729,7 +729,7 @@ class ROIs:
       
         if quality[0] == True:
             soma_geocenter = all_cntrs[0].mean(0)
-            soma_offset = density_center - soma_geocenter 
+            soma_offset = soma_geocenter - density_center 
         else:
             soma_offset = np.array([0,0])
         
@@ -869,6 +869,28 @@ class ROIs:
 
     def plot_rois(self, roi_max_distance=300):
 
+        def get_sumline(self):
+    
+            sumLine = self.data_stack['sumLine']
+
+            sumLine /= sumLine.max()
+            num_layers = len(sumLine)
+                
+            depth0 = np.vstack(self.df_paths.path / self.pixel_sizes_stack).max(0)[2]
+            depth1 = np.where([self.data_stack['line_stratification_yz'].T.mean(1) != 0])[1][-1]
+                
+        #     return sumLine, depth0, depth1
+            new_sum = np.roll(sumLine, -int(depth1-depth0))
+            
+            ON = np.where(self.data_stack['scaledIPLdepth'] == 0)[0][0]
+            OFF = np.where(self.data_stack['scaledIPLdepth'] == 1)[0][0]
+            layerON  = ((OFF - ON) * 0.48 + ON - (depth1 - depth0)) * self.pixel_sizes_stack[2]
+            layerOFF =  ((OFF - ON) * 0.77 + ON - (depth1 - depth0)) * self.pixel_sizes_stack[2]
+            
+            return new_sum, layerON, layerOFF
+
+        sumLine, layerON, layerOFF = get_sumline(self)
+
         fig = plt.figure(figsize=(8.27,8.27))
 
         ax1 = plt.subplot2grid((4,4), (0,1), rowspan=3, colspan=3)
@@ -902,7 +924,14 @@ class ROIs:
         ax2.scatter(rois_pos[:, 2], rois_pos[:, 0], c=rois_dis, s=40 * 0.8, 
                     cmap=plt.cm.viridis, vmin=0, vmax=roi_max_distance, zorder=10)
         ax2.scatter(soma_pos[2], soma_pos[0], c='grey', s=160, zorder=10)
-        
+
+        ax3.axhline(layerON, color='red', linestyle='dashed')
+        ax3.axhline(layerOFF, color='red', linestyle='dashed')    
+
+        ax3.annotate('ON', xy=(0, layerON), xytext=(-22, layerON-5), zorder=10,weight="bold")
+        ax3.annotate('OFF', xy=(0, layerOFF), xytext=(-22, layerOFF-5),zorder=10, weight="bold")
+        ax3.plot(np.roll(sumLine, -int(depth1-depth0)) * 30, np.linspace(0, maxlim1 ,num_layers), color='black')
+
         ax3.scatter(rois_pos[:, 1], rois_pos[:, 2], c=rois_dis, s=40 * 0.8, 
                     cmap=plt.cm.viridis, vmin=0, vmax=roi_max_distance, zorder=10)
         ax3.scatter(soma_pos[1], soma_pos[2], c='grey', s=160, zorder=10)
@@ -1053,8 +1082,8 @@ class ROIs:
         
         cntrs_all = [cntrs_calibrate_to_soma, cntrs_calibrate_to_rois]
         offsets_all = [offsets_calibrate_to_soma, offsets_calibrate_to_rois]
-        titles_all = ['Contours calibrated by soma RF center\nto dendritic tree center offset\nif soma receptive exists',
-                      'Coutours calibrated by \naverage Rois RF center to Rois position offset']
+        titles_all = ['Adjusted by soma offset(if exists)',
+                      'Adjusted by ROIs mean offset']
         
         quality = self.df_sta['cntr_quality'].values
 
@@ -1098,6 +1127,8 @@ class ROIs:
             im.set_title(titles_all[ii])
             im.axis('off')
 
+        # plt.tight_layout()
+
         return fig, ax
 
     def plot_distance(self, xlim=300, ylim=50, p0=[1,1e-6,1],rftype='raw'):
@@ -1108,6 +1139,7 @@ class ROIs:
             return A*np.exp(-B*x)-C
         quality = self.df_sta['cntr_quality'].tolist()
         dist = self.df_rois_sub['dendritic_distance_to_soma'].values[quality].astype(float)
+
         size = self.df_sta['rf_' + rftype + 
                            '_smoothed_upsampled_size'].values[quality].astype(float)
 
@@ -1209,4 +1241,42 @@ class ROIs:
             
         plt.suptitle('Overlap Hexbin')
 
+        return fig, ax
+
+    def plot_offset(self):
+    
+        soma_pos = self.soma
+        dendrites = self.df_paths[self.df_paths.type == 3]   
+
+        quality = self.df_sta['cntr_quality'].values
+
+        rois_pos = np.vstack(self.df_rois_sub.roi_pos)[quality]
+        rois_dis = self.df_rois_sub.dendritic_distance_to_soma.values[quality]
+        
+        offsets_calibrate_to_soma = self.df_sta['cntrs_offset_calibrate_to_soma'].values[quality]
+        offsets_calibrate_to_rois = self.df_sta['cntrs_offset_calibrate_to_rois'].values[quality]
+
+        offsets_all = [offsets_calibrate_to_soma, offsets_calibrate_to_rois]
+        titles_all = ['Calibrated by soma RF center\nto dendritic tree center offset\n(if soma RF exists)',
+                      'Calibrated by \naverage Rois RF center to Rois position offset']
+            
+        fig, ax = plt.subplots(1,2, figsize=(8.27,8.27*0.45))
+        
+        for ii, im in enumerate(ax):
+            
+            offsets = offsets_all[ii]
+            offsets = np.sqrt((np.vstack(offsets) ** 2).sum(1))
+            
+            im.scatter(rois_dis, offsets, color='black', s=5)
+            im.set_title(titles_all[ii])
+            im.set_xlim(-10, 220)
+            im.set_ylim(-10, 220)
+            im.set_xlabel('Dendritic distance from ROI to soma')
+            im.set_ylabel('Offset between ROI and RF center(um)')
+            
+            im.spines['left'].set_linewidth(1.5)
+            im.spines['bottom'].set_linewidth(1.5)
+            im.spines['right'].set_linewidth(0)
+            im.spines['top'].set_linewidth(0)
+            
         return fig, ax
