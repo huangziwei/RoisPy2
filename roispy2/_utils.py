@@ -59,7 +59,7 @@ def get_data_paths(rootdir, experimenter, expdate, expnum):
 
     noise_h5_paths = []
     chirp_h5_paths = []
-    lchirp_h5_paths = []
+    lchirp_h5_paths = []    
 
     for file in os.listdir(exproot):
         if ('.ini' in file.lower()):
@@ -83,13 +83,13 @@ def get_data_paths(rootdir, experimenter, expdate, expnum):
         if ('_s_lchirp' in file.lower()):
             soma_lchirp_h5_path = imaging_data_dir + file
         
-        if ('dnoise' in file.lower() and '_s' not in file.lower()):
+        if ('dnoise' in file.lower() and '_s' not in file.lower() and 'ttx' not in file.lower()):
             noise_h5_paths.append(imaging_data_dir + file)
-        
-        if ('_chirp' in file.lower() and '_s' not in file.lower()):
+
+        if ('_chirp' in file.lower() and '_s' not in file.lower() and 'ttx' not in file.lower()):
             chirp_h5_paths.append(imaging_data_dir + file)
         
-        if ('_lchirp' in file.lower() and '_s' not in file.lower()):
+        if ('_lchirp' in file.lower() and '_s' not in file.lower() and 'ttx' not in file.lower()):
             lchirp_h5_paths.append(imaging_data_dir + file)
 
     noise_h5_paths.sort()
@@ -180,12 +180,117 @@ def get_data_paths(rootdir, experimenter, expdate, expnum):
 
     return data_dict
 
+def get_ttx_paths(rootdir, experimenter, expdate, expnum):
+
+    exproot = rootdir + '/' + experimenter + '/' + expdate + '/' + str(expnum) + '/'
+    imaging_data_dir = exproot + 'Pre/'
+    morph_data_dir = exproot + 'Raw/'
+
+    noise_h5_paths = []
+    noisettx_h5_paths = []
+    for file in os.listdir(exproot):
+        if ('.ini' in file.lower()):
+            headerfile_path = exproot + file
+
+    for file in os.listdir(morph_data_dir):
+        if ('.swc' in file.lower()):
+            swc_path = morph_data_dir + file
+    
+    for file in os.listdir(imaging_data_dir):
+#         logging.info(file)
+        if ('stack.h5' in file.lower()):
+            stack_h5_path = imaging_data_dir + file 
+        
+        if ('_s_dnoise' in file.lower()):
+            soma_noise_h5_path = imaging_data_dir + file
+
+        if ('_s_chirp' in file.lower()):
+            soma_chirp_h5_path = imaging_data_dir + file
+
+        if ('_s_lchirp' in file.lower()):
+            soma_lchirp_h5_path = imaging_data_dir + file
+
+        if ('dnoise' in file.lower() and '_s' not in file.lower() and 'ttx' in file.lower()):
+            noise_h5_paths.append(imaging_data_dir + file)
+
+    noise_h5_paths.sort()
+    noisettx_h5_paths.sort()
+
+    logging.info('  Root Dir: \n\t\t{}'.format(rootdir))
+    logging.info('  Imaging Data Dir: \n\t\t{}\n'.format(imaging_data_dir))
+    logging.info('  Morph Data Dir: \n\t\t{}\n'.format(morph_data_dir))
+    
+    try:
+        logging.info('  stack_h5_path: \n\t\t{} \n'.format(stack_h5_path.split('/')[-1]))
+    except UnboundLocalError:
+        stack_h5_path = None
+        logging.info('  stack_h5_path: \n\t\t{} \n')
+    
+    try:
+        logging.info('  soma_noise_h5_path:\n\t\t{}\n'.format(soma_noise_h5_path.split('/')[-1]))
+    except UnboundLocalError:
+        soma_noise_h5_path = None
+        logging.info('  soma_noise_h5_path: \n\t\tNone \n')
+    
+    try:
+        logging.info('  soma_chirp_h5_path: \n\t\t{}\n'.format(soma_chirp_h5_path.split('/')[-1]))
+    except UnboundLocalError:
+        soma_chirp_h5_path = None
+        logging.info('  soma_chirp_h5_path: \n\t\tNone \n')    
+    
+    try:
+        logging.info('  soma_lchirp_h5_path: \n\t\t{}\n'.format(soma_lchirp_h5_path.split('/')[-1]))
+    except UnboundLocalError:
+        soma_lchirp_h5_path = None
+        logging.info('  soma_lchirp_h5_path: \n\t\tNone \n')
+ 
+    logging.info('  noise_h5:')
+    if len(noise_h5_paths) == 0:
+        logging.info('  \tNo Noise files')
+    else:
+        for idx, noisefile in enumerate(noise_h5_paths):
+            logging.info('  \t{}: {}'.format(idx, noisefile.split('/')[-1]))
+        
+    try:
+        logging.info('  swc_path: \n\t\t{} \n'.format(swc_path.split('/')[-1]))
+    except UnboundLocalError:
+        stack_h5_path = None
+        logging.info('  stack_h5_path: \n\t\t{} \n')
+
+    try:
+        logging.info('  headerfile_path: \n\t\t{} \n'.format(headerfile_path.split('/')[-1]))
+    except UnboundLocalError:
+        stack_h5_path = None
+        logging.info('  headerfile_path: \n\t\t{} \n')
+
+    data_dict = {
+
+        "imaging_data_dir": imaging_data_dir,
+
+        "stack_h5_path":stack_h5_path,
+        
+        "soma_noise_h5_path":soma_noise_h5_path,
+        "soma_chirp_h5_path":soma_chirp_h5_path,
+        "soma_lchirp_h5_path":soma_lchirp_h5_path,    
+        "noise_h5_paths": noise_h5_paths,
+        "swc_path": swc_path,
+
+        "headerfile": headerfile_path,
+    }
+    
+    logging.info('  Finished reading data paths.\n')
+
+    return data_dict
+
 def load_h5_data(file_name):
     """
     Helper function to load h5 file.
     """
     with h5py.File(file_name,'r') as f:
         return {key:f[key][:] for key in list(f.keys())}
+
+# def load_stimulus(file_name):
+#     with h5py.File(file_name)
 
 def get_pixel_size_stack(stack):
     

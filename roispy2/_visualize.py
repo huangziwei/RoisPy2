@@ -9,6 +9,8 @@ def _plot_rfs(df_sta, rftype, cntrtype):
     rec_ids = df_sta['rec_id']
     roi_ids = df_sta['roi_id']
     rfs = df_sta['{}'.format(rftype)]
+    rf_quality = df_sta['rf_quality']
+    # rf_quality_index = df_sta['rf_quality_index']
     
 
     if 'upsampled' in rftype:
@@ -38,8 +40,10 @@ def _plot_rfs(df_sta, rftype, cntrtype):
             
             idx = fig_idx + counter * 32
             rf = row
+
             rf_size = rf_sizes[idx]
-            
+            # rf_q = rf_quality_index[idx]
+
             ax[fig_idx].imshow(rf, origin='lower', cmap=plt.cm.binary)
             ax[fig_idx].axis('off')
             
@@ -50,8 +54,13 @@ def _plot_rfs(df_sta, rftype, cntrtype):
                 ax[fig_idx].plot(cntr_y, cntr_x, color='red')
             
             ax[fig_idx].set_title('{}({},{}): RF size {:.3f}'.format(idx, rec_ids[idx], roi_ids[idx], rf_size), fontsize=10)
+            
+            if not rf_quality[idx]:   
+                for axis in ['top','bottom','left','right']:
+                    ax[fig_idx].spines[axis].set_linewidth(3)
+                    ax[fig_idx].spines[axis].set_color('red')  
+            
 
-        
         if fig_idx < 31:
             for redundent in range(fig_idx, 32):
                 ax[redundent].axis('off')

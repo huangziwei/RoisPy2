@@ -1,6 +1,6 @@
 Metadata-Version: 1.0
 Name: roispy2
-Version: 0.0.1
+Version: 0.0.2
 Summary: Analyze 2P calcium imaging data from mouse retina ganglion cells.
 Home-page: https://github.com/huangziwei/RoisPy
 Author: Ziwei Huang
