@@ -187,7 +187,9 @@ def get_ttx_paths(rootdir, experimenter, expdate, expnum):
     morph_data_dir = exproot + 'Raw/'
 
     noise_h5_paths = []
-    noisettx_h5_paths = []
+    chirp_h5_paths = []
+    lchirp_h5_paths = []    
+
     for file in os.listdir(exproot):
         if ('.ini' in file.lower()):
             headerfile_path = exproot + file
@@ -213,8 +215,15 @@ def get_ttx_paths(rootdir, experimenter, expdate, expnum):
         if ('dnoise' in file.lower() and '_s' not in file.lower() and 'ttx' in file.lower()):
             noise_h5_paths.append(imaging_data_dir + file)
 
+        if ('_chirp' in file.lower() and '_s' not in file.lower() and 'ttx' in file.lower()):
+            chirp_h5_paths.append(imaging_data_dir + file)
+        
+        if ('_lchirp' in file.lower() and '_s' not in file.lower() and 'ttx' in file.lower()):
+            lchirp_h5_paths.append(imaging_data_dir + file)
+
     noise_h5_paths.sort()
-    noisettx_h5_paths.sort()
+    chirp_h5_paths.sort()
+    lchirp_h5_paths.sort()
 
     logging.info('  Root Dir: \n\t\t{}'.format(rootdir))
     logging.info('  Imaging Data Dir: \n\t\t{}\n'.format(imaging_data_dir))
@@ -273,10 +282,13 @@ def get_ttx_paths(rootdir, experimenter, expdate, expnum):
         "soma_chirp_h5_path":soma_chirp_h5_path,
         "soma_lchirp_h5_path":soma_lchirp_h5_path,    
         "noise_h5_paths": noise_h5_paths,
+        "chirp_h5_paths": chirp_h5_paths,
+        "lchirp_h5_paths": lchirp_h5_paths,
         "swc_path": swc_path,
 
         "headerfile": headerfile_path,
     }
+
     
     logging.info('  Finished reading data paths.\n')
 
@@ -478,9 +490,9 @@ def get_dendritic_distance_to_soma(df_paths, path_id, loc_on_path):
     
     return length_all_paths-length_to_reduce
 
-def get_euclidean_distance_to_soma(roi_pos, soma_pos):
+def get_euclidean_distance_to_one_point(roi_pos, point_pos):
     
-    return np.sqrt(np.sum((roi_pos -soma_pos) ** 2))
+    return np.sqrt(np.sum((roi_pos -point_pos) ** 2))
 
 
 def get_density_center(df_paths, soma, Z):    
@@ -517,38 +529,82 @@ def angle_btw_node(roi_0_pos, roi_1_pos, node):
     return np.degrees(np.arccos(np.clip(np.dot(v0, v1), -1.0, 1.0)))
     
 
-def get_cntr_interception(cntr0, cntr1):
+# def get_cntr_interception(cntr0, cntr1):
     
-    if cntr0.shape[0] > cntr1.shape[0]:
-        sCntr = cntr1.copy()
-        bCntr = cntr0.copy()
-    else:
-        sCntr = cntr0.copy()
-        bCntr = cntr1.copy()
+#     if cntr0.shape[0] > cntr1.shape[0]:
+#         sCntr = cntr1.copy()
+#         bCntr = cntr0.copy()
+#     else:
+#         sCntr = cntr0.copy()
+#         bCntr = cntr1.copy()
     
-    sCntrPoly = Polygon(sCntr)
-    bCntrPoly = Polygon(bCntr)
+#     sCntrPoly = Polygon(sCntr)
+#     bCntrPoly = Polygon(bCntr)
     
-    sCntr_area = sCntrPoly.area
-    bCntr_area = bCntrPoly.area
+#     sCntr_area = sCntrPoly.area
+#     bCntr_area = bCntrPoly.area
     
-    check_intercept =  sCntrPoly.intersects(bCntrPoly)
+#     check_intercept =  sCntrPoly.intersects(bCntrPoly)
     
-    if check_intercept:
+#     if check_intercept:
         
-        CntrInpt = sCntrPoly.intersection(bCntrPoly)
+#         CntrInpt = sCntrPoly.intersection(bCntrPoly)
         
-        if CntrInpt.type == 'Polygon':
-            inner_cntr_list = [np.asarray(CntrInpt.boundary.coords)]
-            overlap_area = CntrInpt.area
-        elif CntrInpt.type == 'MultiPolygon':
-            inner_cntr_list = []
-            overlap_area = 0
-            for i in np.arange(len(CntrInpt.geoms)):
-                inner_cntr_list.append(np.asarray(CntrInpt.geoms[i].boundary.coords))
-                overlap_area += CntrInpt.geoms[i].area
-    else:
-        inner_cntr_list = [np.nan]
-        overlap_area = 0
+#         if CntrInpt.type == 'Polygon':
+#             inner_cntr_list = [np.asarray(CntrInpt.boundary.coords)]
+#             overlap_area = CntrInpt.area
+#         elif CntrInpt.type == 'MultiPolygon':
+#             inner_cntr_list = []
+#             overlap_area = 0
+#             for i in np.arange(len(CntrInpt.geoms)):
+#                 inner_cntr_list.append(np.asarray(CntrInpt.geoms[i].boundary.coords))
+#                 overlap_area += CntrInpt.geoms[i].area
+#     else:
+#         inner_cntr_list = [np.nan]
+#         overlap_area = 0
         
-    return inner_cntr_list, sCntr_area/1000, bCntr_area/1000, overlap_area/1000, overlap_area/sCntr_area
+#     return inner_cntr_list, sCntr_area/1000, bCntr_area/1000, overlap_area/1000, overlap_area/sCntr_area
+
+def get_cntr_interception(roi_0_cntr, roi_1_cntr):
+    
+    inner_cntr_list_all = []
+    overlap_index_all = []
+    for cntr0 in roi_0_cntr:
+        for cntr1 in roi_1_cntr:
+            if cntr0.shape[0] > cntr1.shape[0]:
+                sCntr = cntr1.copy()
+                bCntr = cntr0.copy()
+            else:
+                sCntr = cntr0.copy()
+                bCntr = cntr1.copy()
+
+            sCntrPoly = Polygon(sCntr)
+            bCntrPoly = Polygon(bCntr)
+
+            sCntr_area = sCntrPoly.area
+            bCntr_area = bCntrPoly.area
+
+            check_intercept =  sCntrPoly.intersects(bCntrPoly)
+
+            if check_intercept:
+
+                CntrInpt = sCntrPoly.intersection(bCntrPoly)
+
+                if CntrInpt.type == 'Polygon':
+                    inner_cntr_list = [np.asarray(CntrInpt.boundary.coords)]
+                    overlap_area = CntrInpt.area
+                elif CntrInpt.type == 'MultiPolygon':
+                    inner_cntr_list = []
+                    overlap_area = 0
+                    for i in np.arange(len(CntrInpt.geoms)):
+                        inner_cntr_list.append(np.asarray(CntrInpt.geoms[i].boundary.coords))
+                        overlap_area += CntrInpt.geoms[i].area
+                        
+            else:
+                inner_cntr_list = [np.nan]
+                overlap_area = 0
+                
+            overlap_index_all.append(overlap_area/sCntr_area)
+            inner_cntr_list_all.append(inner_cntr_list)
+            
+    return inner_cntr_list_all, np.mean(overlap_index_all)
