@@ -9,6 +9,7 @@ import networkx as nx
 from copy import deepcopy
 
 from skimage.feature import match_template
+from shapely.geometry import Polygon
 
 def get_logger(loglevel):
 
@@ -29,31 +30,40 @@ def get_logger(loglevel):
 
     logger = logging.getLogger()
 
-    LEVELS = {'debug': logging.DEBUG,
-              'info': logging.INFO,
-              'warning': logging.WARNING,
-              'error': logging.ERROR,
-              'critical': logging.CRITICAL}
+    if loglevel is not None:
 
-    try:
-        LEVEL = LEVELS[loglevel]
-        logger.setLevel(LEVEL)
-    except ValueError:
-        logger.setLevel(logging.INFO)
-        logging.info('  Please enter a valid logging mode (DEBUG, INFO, WARNING, ERROR, CRITICAL).')
-        logger.setLevel(logging.ERROR)
+        LEVELS = {'debug': logging.DEBUG,
+                  'info': logging.INFO,
+                  'warning': logging.WARNING,
+                  'error': logging.ERROR,
+                  'critical': logging.CRITICAL}
 
-    return logger
+        try:
+            LEVEL = LEVELS[loglevel]
+            logger.setLevel(LEVEL)
+        except ValueError:
+            logger.setLevel(logging.INFO)
+            logging.info('  Please enter a valid logging mode (DEBUG, INFO, WARNING, ERROR, CRITICAL).')
+            logger.setLevel(logging.ERROR)
+
+        return logger
+    else:
+        return None
 
 
 def get_data_paths(rootdir, experimenter, expdate, expnum):
 
-    imaging_data_dir = rootdir + '/' + experimenter + '/' + expdate + '/' + str(expnum) + '/Pre/'
-    morph_data_dir = rootdir + '/' + experimenter + '/' + expdate + '/' + str(expnum) + '/Raw/'
+    exproot = rootdir + '/' + experimenter + '/' + expdate + '/' + str(expnum) + '/'
+    imaging_data_dir = exproot + 'Pre/'
+    morph_data_dir = exproot + 'Raw/'
 
     noise_h5_paths = []
     chirp_h5_paths = []
-    lchirp_h5_paths = []
+    lchirp_h5_paths = []    
+
+    for file in os.listdir(exproot):
+        if ('.ini' in file.lower()):
+            headerfile_path = exproot + file
 
     for file in os.listdir(morph_data_dir):
         if ('.swc' in file.lower()):
@@ -61,7 +71,7 @@ def get_data_paths(rootdir, experimenter, expdate, expnum):
     
     for file in os.listdir(imaging_data_dir):
 #         logging.info(file)
-        if ('stack.h5' in file.lower()):
+        if ('stack' in file.lower()):
             stack_h5_path = imaging_data_dir + file 
         
         if ('_s_dnoise' in file.lower()):
@@ -73,13 +83,13 @@ def get_data_paths(rootdir, experimenter, expdate, expnum):
         if ('_s_lchirp' in file.lower()):
             soma_lchirp_h5_path = imaging_data_dir + file
         
-        if ('dnoise' in file.lower() and '_s' not in file.lower()):
+        if ('dnoise' in file.lower() and '_s' not in file.lower() and 'ttx' not in file.lower()):
             noise_h5_paths.append(imaging_data_dir + file)
-        
-        if ('_chirp' in file.lower() and '_s' not in file.lower()):
+
+        if ('_chirp' in file.lower() and '_s' not in file.lower() and 'ttx' not in file.lower()):
             chirp_h5_paths.append(imaging_data_dir + file)
         
-        if ('_lchirp' in file.lower() and '_s' not in file.lower()):
+        if ('_lchirp' in file.lower() and '_s' not in file.lower() and 'ttx' not in file.lower()):
             lchirp_h5_paths.append(imaging_data_dir + file)
 
     noise_h5_paths.sort()
@@ -142,6 +152,12 @@ def get_data_paths(rootdir, experimenter, expdate, expnum):
         stack_h5_path = None
         logging.info('  stack_h5_path: \n\t\t{} \n')
 
+    try:
+        logging.info('  headerfile_path: \n\t\t{} \n'.format(headerfile_path.split('/')[-1]))
+    except UnboundLocalError:
+        stack_h5_path = None
+        logging.info('  headerfile_path: \n\t\t{} \n')
+
     data_dict = {
 
         "imaging_data_dir": imaging_data_dir,
@@ -155,8 +171,124 @@ def get_data_paths(rootdir, experimenter, expdate, expnum):
         "chirp_h5_paths": chirp_h5_paths,
         "lchirp_h5_paths": lchirp_h5_paths,
 
-        "swc_path": swc_path
+        "swc_path": swc_path,
+
+        "headerfile": headerfile_path,
     }
+    
+    logging.info('  Finished reading data paths.\n')
+
+    return data_dict
+
+def get_ttx_paths(rootdir, experimenter, expdate, expnum):
+
+    exproot = rootdir + '/' + experimenter + '/' + expdate + '/' + str(expnum) + '/'
+    imaging_data_dir = exproot + 'Pre/'
+    morph_data_dir = exproot + 'Raw/'
+
+    noise_h5_paths = []
+    chirp_h5_paths = []
+    lchirp_h5_paths = []    
+
+    for file in os.listdir(exproot):
+        if ('.ini' in file.lower()):
+            headerfile_path = exproot + file
+
+    for file in os.listdir(morph_data_dir):
+        if ('.swc' in file.lower()):
+            swc_path = morph_data_dir + file
+    
+    for file in os.listdir(imaging_data_dir):
+#         logging.info(file)
+        if ('stack.h5' in file.lower()):
+            stack_h5_path = imaging_data_dir + file 
+        
+        if ('_s_dnoise' in file.lower()):
+            soma_noise_h5_path = imaging_data_dir + file
+
+        if ('_s_chirp' in file.lower()):
+            soma_chirp_h5_path = imaging_data_dir + file
+
+        if ('_s_lchirp' in file.lower()):
+            soma_lchirp_h5_path = imaging_data_dir + file
+
+        if ('dnoise' in file.lower() and '_s' not in file.lower() and 'ttx' in file.lower()):
+            noise_h5_paths.append(imaging_data_dir + file)
+
+        if ('_chirp' in file.lower() and '_s' not in file.lower() and 'ttx' in file.lower()):
+            chirp_h5_paths.append(imaging_data_dir + file)
+        
+        if ('_lchirp' in file.lower() and '_s' not in file.lower() and 'ttx' in file.lower()):
+            lchirp_h5_paths.append(imaging_data_dir + file)
+
+    noise_h5_paths.sort()
+    chirp_h5_paths.sort()
+    lchirp_h5_paths.sort()
+
+    logging.info('  Root Dir: \n\t\t{}'.format(rootdir))
+    logging.info('  Imaging Data Dir: \n\t\t{}\n'.format(imaging_data_dir))
+    logging.info('  Morph Data Dir: \n\t\t{}\n'.format(morph_data_dir))
+    
+    try:
+        logging.info('  stack_h5_path: \n\t\t{} \n'.format(stack_h5_path.split('/')[-1]))
+    except UnboundLocalError:
+        stack_h5_path = None
+        logging.info('  stack_h5_path: \n\t\t{} \n')
+    
+    try:
+        logging.info('  soma_noise_h5_path:\n\t\t{}\n'.format(soma_noise_h5_path.split('/')[-1]))
+    except UnboundLocalError:
+        soma_noise_h5_path = None
+        logging.info('  soma_noise_h5_path: \n\t\tNone \n')
+    
+    try:
+        logging.info('  soma_chirp_h5_path: \n\t\t{}\n'.format(soma_chirp_h5_path.split('/')[-1]))
+    except UnboundLocalError:
+        soma_chirp_h5_path = None
+        logging.info('  soma_chirp_h5_path: \n\t\tNone \n')    
+    
+    try:
+        logging.info('  soma_lchirp_h5_path: \n\t\t{}\n'.format(soma_lchirp_h5_path.split('/')[-1]))
+    except UnboundLocalError:
+        soma_lchirp_h5_path = None
+        logging.info('  soma_lchirp_h5_path: \n\t\tNone \n')
+ 
+    logging.info('  noise_h5:')
+    if len(noise_h5_paths) == 0:
+        logging.info('  \tNo Noise files')
+    else:
+        for idx, noisefile in enumerate(noise_h5_paths):
+            logging.info('  \t{}: {}'.format(idx, noisefile.split('/')[-1]))
+        
+    try:
+        logging.info('  swc_path: \n\t\t{} \n'.format(swc_path.split('/')[-1]))
+    except UnboundLocalError:
+        stack_h5_path = None
+        logging.info('  stack_h5_path: \n\t\t{} \n')
+
+    try:
+        logging.info('  headerfile_path: \n\t\t{} \n'.format(headerfile_path.split('/')[-1]))
+    except UnboundLocalError:
+        stack_h5_path = None
+        logging.info('  headerfile_path: \n\t\t{} \n')
+
+    data_dict = {
+
+        "imaging_data_dir": imaging_data_dir,
+
+        "stack_h5_path":stack_h5_path,
+        
+        "soma_noise_h5_path":soma_noise_h5_path,
+        "soma_chirp_h5_path":soma_chirp_h5_path,
+        "soma_lchirp_h5_path":soma_lchirp_h5_path,    
+        "noise_h5_paths": noise_h5_paths,
+        "chirp_h5_paths": chirp_h5_paths,
+        "lchirp_h5_paths": lchirp_h5_paths,
+        "swc_path": swc_path,
+
+        "headerfile": headerfile_path,
+    }
+
     
     logging.info('  Finished reading data paths.\n')
 
@@ -168,6 +300,9 @@ def load_h5_data(file_name):
     """
     with h5py.File(file_name,'r') as f:
         return {key:f[key][:] for key in list(f.keys())}
+
+# def load_stimulus(file_name):
+#     with h5py.File(file_name)
 
 def get_pixel_size_stack(stack):
     
@@ -355,7 +490,121 @@ def get_dendritic_distance_to_soma(df_paths, path_id, loc_on_path):
     
     return length_all_paths-length_to_reduce
 
-def get_euclidean_distance_to_soma(roi_pos, soma_pos):
+def get_euclidean_distance_to_one_point(roi_pos, point_pos):
     
-    return np.sqrt(np.sum((roi_pos -soma_pos) ** 2))
+    return np.sqrt(np.sum((roi_pos -point_pos) ** 2))
 
+
+def get_density_center(df_paths, soma, Z):    
+    
+    from scipy.ndimage.measurements import center_of_mass
+    def change_coordinate(coords, origin_size, new_size):
+
+        coords_new = np.array(coords) * (max(new_size) - min(new_size)) / max(origin_size) - max(new_size) 
+
+        return coords_new
+
+    xy = np.vstack(df_paths.path)[:, :2] - soma[:2]
+    lim_max = int(np.ceil((xy.T).max() / 20) * 20)
+    lim_min = int(np.floor((xy.T).min() / 20) * 20)
+    lim = max(abs(lim_max), abs(lim_min))
+
+    density_center = center_of_mass(Z)[::-1]
+    density_center = change_coordinate(density_center, (0, max(Z.shape)), (-lim, lim))
+    density_center += soma[:2]
+    
+    return density_center
+
+
+# helpers for pariwise
+
+def unit_vector(v):
+    return v / np.linalg.norm(v)
+
+def angle_btw_node(roi_0_pos, roi_1_pos, node):
+    
+    v0 = unit_vector(roi_0_pos - node)
+    v1 = unit_vector(roi_1_pos - node)
+    
+    return np.degrees(np.arccos(np.clip(np.dot(v0, v1), -1.0, 1.0)))
+    
+
+# def get_cntr_interception(cntr0, cntr1):
+    
+#     if cntr0.shape[0] > cntr1.shape[0]:
+#         sCntr = cntr1.copy()
+#         bCntr = cntr0.copy()
+#     else:
+#         sCntr = cntr0.copy()
+#         bCntr = cntr1.copy()
+    
+#     sCntrPoly = Polygon(sCntr)
+#     bCntrPoly = Polygon(bCntr)
+    
+#     sCntr_area = sCntrPoly.area
+#     bCntr_area = bCntrPoly.area
+    
+#     check_intercept =  sCntrPoly.intersects(bCntrPoly)
+    
+#     if check_intercept:
+        
+#         CntrInpt = sCntrPoly.intersection(bCntrPoly)
+        
+#         if CntrInpt.type == 'Polygon':
+#             inner_cntr_list = [np.asarray(CntrInpt.boundary.coords)]
+#             overlap_area = CntrInpt.area
+#         elif CntrInpt.type == 'MultiPolygon':
+#             inner_cntr_list = []
+#             overlap_area = 0
+#             for i in np.arange(len(CntrInpt.geoms)):
+#                 inner_cntr_list.append(np.asarray(CntrInpt.geoms[i].boundary.coords))
+#                 overlap_area += CntrInpt.geoms[i].area
+#     else:
+#         inner_cntr_list = [np.nan]
+#         overlap_area = 0
+        
+#     return inner_cntr_list, sCntr_area/1000, bCntr_area/1000, overlap_area/1000, overlap_area/sCntr_area
+
+def get_cntr_interception(roi_0_cntr, roi_1_cntr):
+    
+    inner_cntr_list_all = []
+    overlap_index_all = []
+    for cntr0 in roi_0_cntr:
+        for cntr1 in roi_1_cntr:
+            if cntr0.shape[0] > cntr1.shape[0]:
+                sCntr = cntr1.copy()
+                bCntr = cntr0.copy()
+            else:
+                sCntr = cntr0.copy()
+                bCntr = cntr1.copy()
+
+            sCntrPoly = Polygon(sCntr)
+            bCntrPoly = Polygon(bCntr)
+
+            sCntr_area = sCntrPoly.area
+            bCntr_area = bCntrPoly.area
+
+            check_intercept =  sCntrPoly.intersects(bCntrPoly)
+
+            if check_intercept:
+
+                CntrInpt = sCntrPoly.intersection(bCntrPoly)
+
+                if CntrInpt.type == 'Polygon':
+                    inner_cntr_list = [np.asarray(CntrInpt.boundary.coords)]
+                    overlap_area = CntrInpt.area
+                elif CntrInpt.type == 'MultiPolygon':
+                    inner_cntr_list = []
+                    overlap_area = 0
+                    for i in np.arange(len(CntrInpt.geoms)):
+                        inner_cntr_list.append(np.asarray(CntrInpt.geoms[i].boundary.coords))
+                        overlap_area += CntrInpt.geoms[i].area
+                        
+            else:
+                inner_cntr_list = [np.nan]
+                overlap_area = 0
+                
+            overlap_index_all.append(overlap_area/sCntr_area)
+            inner_cntr_list_all.append(inner_cntr_list)
+            
+    return inner_cntr_list_all, np.mean(overlap_index_all)

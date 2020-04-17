@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(name='roispy2',
-      version='0.0.1',
+      version='0.0.2',
       description='Analyze 2P calcium imaging data from mouse retina ganglion cells.',
       author='Ziwei Huang',
       author_email='huang-ziwei@outlook.com',
