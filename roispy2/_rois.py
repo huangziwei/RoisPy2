@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 from matplotlib_scalebar.scalebar import ScaleBar
 
 from ._utils import *
-from ._sta import *
+# from ._sta import *
 from ._visualize import _plot_rfs
 
 
