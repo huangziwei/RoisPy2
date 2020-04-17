@@ -10,7 +10,8 @@ from sklearn.utils.extmath import randomized_svd
 # from matplotlib import _cntr as cntr
 import matplotlib.pyplot as plt
 
-from rfest import ASD
+# from rfest import ASD
+from rfest import splineLG, build_design_matrix, get_spatial_and_temporal_filters
 
 def znorm(data):
     return (data - data.mean())/data.std()
@@ -33,39 +34,53 @@ def lag_weights(weights,nLag):
         
     return lagW
 
-def get_sta(*data, stimulus, methods, num_iters):
+def get_sta(*data, stimulus, df, num_iters, lambd, verbal):
     
     (rec_id, roi_id, 
      tracetime, triggertime, 
      traces_raw) = data
 
-    weights = interpolate_weights(tracetime, 
+    dims = [5, 20, 15]
+    y = interpolate_weights(tracetime, 
                                   znorm(traces_raw.flatten()), 
                                   triggertime)
 
 
-    weights = weights[:1500]
-    weights = np.gradient(weights) # take the derivative of the calcium trace
-    stimulus = stimulus[:len(weights), :]
+    y = y[:1500]
+    y = np.gradient(y) # take the derivative of the calcium trace
+    stimulus = stimulus[:len(y), :]
+    X = build_design_matrix(stimulus, dims[0])
+    
+    spl = splineLG(X, y, dims, df=df, smooth='cr', compute_mle=False)
+    if num_iters:
+        spl.fit(num_iters=num_iters, lambd=lambd, verbal=verbal)
+        w = spl.w_opt
+    else:
+        w = spl.w_spl
 
-    if methods=='mle':
-        lagged_weights = lag_weights(weights, 5)
-        sta = stimulus.T.dot(lagged_weights)
-        U,S,Vt = randomized_svd(sta, 3)
-        sRF_opt = U[:, 0].reshape(15,20)
-        tRF_opt = Vt[0]
+    sRF, tRF = get_spatial_and_temporal_filters(spl.w_spl, dims)
+
+    return [sRF.T, tRF, w]    
         
-    elif methods=='asd':
 
-        def callback(params, t, g):
-            if (t+1) % num_iters == 0:
-                print("Rec {} ROI{}: {}/{}.".format(rec_id, roi_id, t+1, num_iters))
+#     if methods=='mle':
+#         lagged_weights = lag_weights(weights, 5)
+#         sta = stimulus.T.dot(lagged_weights)
+#         U,S,Vt = randomized_svd(sta, 3)
+#         sRF_opt = U[:, 0].reshape(15,20)
+#         tRF_opt = Vt[0]
+        
+#     elif methods=='asd':
 
-        asd = ASD(stimulus, weights, rf_dims=(15,20,5))
-        asd.fit(initial_params=([2.29,-0.80,2.3]),num_iters=num_iters,callback=callback)
-        sta = asd.w_opt.reshape(15,20,5)
-        sRF_opt = asd.sRF_opt
-        tRF_opt = asd.tRF_opt
+#         def callback(params, t, g):
+#             if (t+1) % num_iters == 0:
+#                 print("Rec {} ROI{}: {}/{}.".format(rec_id, roi_id, t+1, num_iters))
+
+#         asd = ASDreturn [sRF_opt, tRF_opt, sta](stimulus, weights, rf_dims=(15,20,5))
+#         asd.fit(initial_params=([2.29,-0.80,2.3]),num_iters=num_iters,callback=callback)
+#         sta = asd.w_opt.reshape(15,20,5)
+#         sRF_opt = asd.sRF_opt
+#         tRF_opt = asd.tRF_opt
         
     return [sRF_opt, tRF_opt, sta]
     
