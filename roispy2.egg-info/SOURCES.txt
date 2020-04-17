@@ -1,4 +1,5 @@
 README.md
+setup.py
 roispy2/__init__.py
 roispy2/_rois.py
 roispy2/_sta.py

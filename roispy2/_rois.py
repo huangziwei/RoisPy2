@@ -37,7 +37,7 @@ class ROIs:
         self.expnum = expnum
         self.unit = expmeta['unit']
 
-        tmp_data_path = glob.glob('{}.pickle'.format('../output/save_data/{}'.format(self.expdate + '_' + self.expnum)))
+        tmp_data_path = glob.glob('{}.pickle'.format('/gpfs01/berens/user/zhuang/Projects/rgc_dendrites_wip/Notebooks/AnalysisPaper/output/save_data/{}'.format(self.expdate + '_' + self.expnum)))
 
         if len(tmp_data_path) == 1:
             logging.info('  loading saved data.\n')

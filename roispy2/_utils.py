@@ -71,7 +71,7 @@ def get_data_paths(rootdir, experimenter, expdate, expnum):
     
     for file in os.listdir(imaging_data_dir):
 #         logging.info(file)
-        if ('stack.h5' in file.lower()):
+        if ('stack' in file.lower()):
             stack_h5_path = imaging_data_dir + file 
         
         if ('_s_dnoise' in file.lower()):
