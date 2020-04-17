@@ -8,6 +8,7 @@ import pandas as pd
 import networkx as nx
 from copy import deepcopy
 
+from skimage.transform import resize, rotate
 from skimage.feature import match_template
 from shapely.geometry import Polygon
 
@@ -342,7 +343,8 @@ def get_scale_factor(rec, stack):
     
     """
     get the scale factor from rec to stack, 
-    e.g. scipy.misc.imresize(rec, size=scale_factor, interp='nearest')
+    e.g. scipy.misc.im
+    (rec, size=scale_factor, interp='nearest')
     would make the rec into the same scale as stack. 
     """
     
@@ -351,14 +353,29 @@ def get_scale_factor(rec, stack):
     
     return rec_pixel_size / stack_pixel_sizes[0]
 
+# def resize_roi(rec, stack):
+#     return scipy.misc.imresize(rec['ROIs'], size=get_scale_factor(rec, stack), interp='nearest')
+
+# def resize_rec(rec, stack):
+    
+#     reci = rec_preprop(rec)
+    
+#     return scipy.misc.imresize(reci, size=get_scale_factor(rec, stack), interp='nearest')
+
+
 def resize_roi(rec, stack):
-    return scipy.misc.imresize(rec['ROIs'], size=get_scale_factor(rec, stack), interp='nearest')
+    
+    output_shape = np.ceil(np.asarray(rec['ROIs'].shape) * get_scale_factor(rec, stack)).astype(int)
+    
+    return resize(rec['ROIs'], output_shape=output_shape, order=0, mode='constant')
 
 def resize_rec(rec, stack):
     
     reci = rec_preprop(rec)
     
-    return scipy.misc.imresize(reci, size=get_scale_factor(rec, stack), interp='nearest')
+    output_shape = np.ceil(np.asarray(reci.shape) * get_scale_factor(rec, stack)).astype(int)
+
+    return resize(reci, output_shape=output_shape, order=0, mode='constant')
 
 def rotate_rec(rec, stack,angle_adjust=0):
     
@@ -366,7 +383,7 @@ def rotate_rec(rec, stack,angle_adjust=0):
     ang_rad = ang_deg * np.pi / 180 # ratoate angle (radian)
     
     rec_rec = resize_rec(rec, stack)
-    rec_rot = scipy.ndimage.interpolation.rotate(rec_rec, ang_deg)
+    rec_rot = rotate(rec_rec, ang_deg, resize=True, order=1, cval=rec_rec.min())
     
     (shift_x, shift_y) = 0.5 * (np.array(rec_rot.shape) - np.array(rec_rec.shape))
     (cx, cy) = 0.5 * np.array(rec_rec.shape)
@@ -398,8 +415,8 @@ def rotate_roi(rec, stack, angle_adjust=0):
     ang_rad = ang_deg * np.pi / 180 # ratoate angle (radian)
     
     rec_rois = resize_roi(rec, stack)
-    rec_rois_rot = scipy.ndimage.interpolation.rotate(rec_rois, ang_deg, cval=255, order=0)
-    rec_rois_rot = np.ma.masked_where(rec_rois_rot == 255, rec_rois_rot)
+    rec_rois_rot = rotate(rec_rois, ang_deg, cval=1, order=0, resize=True)
+    rec_rois_rot = np.ma.masked_where(rec_rois_rot == 1, rec_rois_rot)
 
     (shift_x, shift_y) = 0.5 * (np.array(rec_rois_rot.shape) - np.array(rec_rois.shape))
     (cx, cy) = 0.5 * np.array(rec_rois.shape)

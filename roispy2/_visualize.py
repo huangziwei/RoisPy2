@@ -213,7 +213,7 @@ from matplotlib_scalebar.scalebar import ScaleBar
 
 #     return fig_list   
 
-def _plot_rfs(df_sta, df_cntr):
+def _plot_rfs(df_sta, df_cntr, kind='sRF_upsampled'):
     
     def rescale_data(data):
         return (data - data.min()) / (data.max() - data.min())
@@ -221,10 +221,10 @@ def _plot_rfs(df_sta, df_cntr):
     rec_ids = df_sta['rec_id']
     roi_ids = df_sta['roi_id']
     
-    rfs = df_sta['sRF_asd_upsampled']
+    rfs = df_sta[kind]
     
     num_row = 6
-    num_col = 3
+    num_col = 4
     num_rf_each_page = num_row * num_col
     
     num_full_pages = len(df_sta)//num_rf_each_page
@@ -290,8 +290,8 @@ def _plot_rfs(df_sta, df_cntr):
         fig_list.append(fig)
 
         if num_pages > 1:
-            plt.suptitle('upsampled ASD' + ' ({})'.format(page_id+1))
+            plt.suptitle('upsampled SPL' + ' ({})'.format(page_id+1))
         else:
-            plt.suptitle('upsampled ASD')
+            plt.suptitle('upsampled SPL')
 
     return fig_list   
