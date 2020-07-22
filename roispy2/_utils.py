@@ -367,7 +367,8 @@ def resize_roi(rec, stack):
     
     output_shape = np.ceil(np.asarray(rec['ROIs'].shape) * get_scale_factor(rec, stack)).astype(int)
     
-    return resize(rec['ROIs'], output_shape=output_shape, order=0, mode='constant')
+    return np.round(resize(rec['ROIs'], output_shape=output_shape, order=0, mode='constant'))
+#     return resize(rec['ROIs'], output_shape=output_shape, order=0, mode='constant')
 
 def resize_rec(rec, stack):
     

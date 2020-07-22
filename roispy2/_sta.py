@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 
 # from rfest import ASD
 from rfest import splineLG, build_design_matrix, get_spatial_and_temporal_filters
+from rfest._utils import softthreshold
 
 def znorm(data):
     return (data - data.mean())/data.std()
@@ -21,7 +22,7 @@ def interpolate_weights(tracetime, traces_znorm, triggers):
     data_interp = sp.interpolate.interp1d(
         tracetime.flatten(), 
         traces_znorm.flatten(),
-        kind = 'linear'
+        kind = 'linear', fill_value='extrapolate',
     ) (triggers)
     
     return znorm(data_interp)
@@ -34,57 +35,60 @@ def lag_weights(weights,nLag):
         
     return lagW
 
-def get_sta(*data, stimulus, df, num_iters, lambd, verbal):
+def upsampled_stimulus(trace, tracetime, triggertime, stim):
+    
+    valid_duration = np.logical_and(tracetime > triggertime[0], tracetime < triggertime[-1])
+
+    trace_valid = trace[valid_duration]
+    tracetime_valid = tracetime[valid_duration]
+
+    y = znorm(trace_valid.copy())
+    y = np.gradient(y)
+    
+    frames = np.vstack([triggertime[:-1], triggertime[1:]]).T
+
+    num_repeats = []
+    for i in range(len(frames)):
+        num_repeats.append(sum((tracetime > frames[i][0]).astype(int) * (tracetime <= frames[i][1]).astype(int)))
+    num_repeats = np.hstack(num_repeats)
+
+    X = np.repeat(stim[:len(frames)], num_repeats, axis=0)
+    
+    return X, y
+
+
+def get_rf(*data, stimulus, df, lambd):
     
     (rec_id, roi_id, 
      tracetime, triggertime, 
      traces_raw) = data
 
-    dims = [5, 20, 15]
-    y = interpolate_weights(tracetime, 
-                                  znorm(traces_raw.flatten()), 
-                                  triggertime)
+    # dims = [5, 20, 15]
+    # y = interpolate_weights(tracetime, 
+    #                              znorm(traces_raw.flatten()), 
+    #                              triggertime)
 
 
-    y = y[:1500]
-    y = np.gradient(y) # take the derivative of the calcium trace
-    stimulus = stimulus[:len(y), :]
-    X = build_design_matrix(stimulus, dims[0])
+    # y = y[:1500]
+    # y = np.gradient(y) # take the derivative of the calcium trace
+    # stimulus = stimulus[:len(y), :]
+    # X = build_design_matrix(stimulus, dims[0])
     
-    spl = splineLG(X, y, dims, df=df, smooth='cr', compute_mle=False)
-    if num_iters:
-        spl.fit(num_iters=num_iters, lambd=lambd, verbal=verbal)
-        w = spl.w_opt
-    else:
-        w = spl.w_spl
+    dims = [20, 20, 15]
+    X, y = upsampled_stimulus(traces_raw, tracetime, triggertime, stimulus)
+    X = build_design_matrix(X, dims[0])
 
-    sRF, tRF = get_spatial_and_temporal_filters(spl.w_spl, dims)
+    spl = splineLG(X, y, dims, df=df, smooth='cc', compute_mle=False)
+    w = softthreshold(spl.w_spl, lambd)
+
+    sRF, tRF = get_spatial_and_temporal_filters(w, dims)
+
+    if np.argmax([np.abs(sRF.max()), np.abs(sRF.min())]):
+        sRF = -sRF
+        tRF = -tRF
 
     return [sRF.T, tRF, w]    
         
-
-#     if methods=='mle':
-#         lagged_weights = lag_weights(weights, 5)
-#         sta = stimulus.T.dot(lagged_weights)
-#         U,S,Vt = randomized_svd(sta, 3)
-#         sRF_opt = U[:, 0].reshape(15,20)
-#         tRF_opt = Vt[0]
-        
-#     elif methods=='asd':
-
-#         def callback(params, t, g):
-#             if (t+1) % num_iters == 0:
-#                 print("Rec {} ROI{}: {}/{}.".format(rec_id, roi_id, t+1, num_iters))
-
-#         asd = ASDreturn [sRF_opt, tRF_opt, sta](stimulus, weights, rf_dims=(15,20,5))
-#         asd.fit(initial_params=([2.29,-0.80,2.3]),num_iters=num_iters,callback=callback)
-#         sta = asd.w_opt.reshape(15,20,5)
-#         sRF_opt = asd.sRF_opt
-#         tRF_opt = asd.tRF_opt
-        
-    return [sRF_opt, tRF_opt, sta]
-    
-
 def smooth_rf(rf, sigma):
     return ndimage.gaussian_filter(rf, sigma=(sigma, sigma), order=0)
 
@@ -98,14 +102,10 @@ def rescale_data(data):
 def standardize_data(data):
     return (data-data.mean()) / data.std()
 
-def get_contour(data, stack_pixel_size, 
+def get_contour(data, levels, stack_pixel_size, 
                 rf_pixel_size=30):
 
     data = rescale_data(data)
-    # levels=np.linspace(0, 1, 41)[::2][10:-6]
-    levels = np.arange(55, 75, 5)/100
-    # levels=np.arange(50, 75, 5)/100
-    
     CS = plt.contour(data, levels=levels)
     plt.clf()
     plt.close()
@@ -119,13 +119,7 @@ def get_contour(data, stack_pixel_size,
 
         cntrs_size = [cv2.contourArea(cntr.astype(np.float32))*stack_pixel_size**2/1000 for cntr in all_cntrs]
 
-        # if i == 0:
-        #     res = pd.Series([all_cntrs, cntrs_size])
-        # else:
-        #     tmp = pd.Series([all_cntrs, cntrs_size])
-        #     res = res.append(tmp)
-        
-        good_cntrs = [cntr[:, ::-1] for cntr in all_cntrs if (cntr[0] == cntr[-1]).all() and cv2.contourArea(cntr.astype(np.float32))*stack_pixel_size**2/1000 > 2.5]
+        good_cntrs = [cntr[:, ::-1] for cntr in all_cntrs if (cntr[0] == cntr[-1]).all() and cv2.contourArea(cntr.astype(np.float32))*stack_pixel_size**2/1000 > 1]
         good_cntrs_size = [cv2.contourArea(cntr.astype(np.float32))*stack_pixel_size**2/1000 for cntr in good_cntrs]
 
         if i == 0:
@@ -136,65 +130,6 @@ def get_contour(data, stack_pixel_size,
 
     res.index = np.arange(len(levels) * 2)
     return res
-
-# def get_contour(data, rf_type, stack_pixel_size, rf_pixel_size=30, threshold=9):
-
-#     data = rescale_data(data)
-
-#     CS = plt.contour(data, levels=np.linspace(0, 1, 31))
-#     ps = CS.collections[-threshold].get_paths()
-#     plt.clf()
-#     all_cntrs = [p.vertices for p in ps]
-    
-#     if 'upsampled' in rf_type:
-#         good_cntrs = [cntr[:, ::-1] for cntr in all_cntrs if (cntr[0] == cntr[-1]).all() and cv2.contourArea(cntr.astype(np.float32))*stack_pixel_size**2/1000 > 2.5]
-#         good_cntrs_size = [cv2.contourArea(cntr.astype(np.float32))*stack_pixel_size**2/1000 for cntr in good_cntrs]
-#     else:
-#         good_cntrs = [cntr[:, ::-1] for cntr in all_cntrs if (cntr[0] == cntr[-1]).all() and cv2.contourArea(cntr.astype(np.float32))*rf_pixel_size**2/1000 > 2.5]
-#         good_cntrs_size = [cv2.contourArea(cntr.astype(np.float32))*rf_pixel_size**2/1000 for cntr in good_cntrs]
-
-#     return pd.Series([good_cntrs, good_cntrs_size])
-
-# def get_contour(data):
-
-#     data = rescale_data(data)
-
-#     CS = plt.contour(normalize(data), levels=np.linspace(0, 1, 21))
-#     ps = CS.collections[-8].get_paths()
-#     all_cntrs = [p.vertices for p in ps]
-#     good_cntrs = [cntr for cntr in all_cntrs if (cntr[0] == cntr[-1]).all() and cv2.contourArea(cntr.astype(np.float32)) > 2]
-#     good_cntrs_size = [cv2.contourArea(cntr.astype(np.float32)) for cntr in good_cntrs]
-
-#     return pd.Series([good_cntrs, good_cntrs_size])
-
-# def get_contour(data, threshold=2):
-    
-#     data = standardize_data(data)
-
-#     x, y = np.mgrid[:data.shape[0], :data.shape[1]]
-#     c = cntr.Cntr(x,y, data)
-    
-#     SD = data.std()
-#     res = c.trace(data.max() - threshold * SD)
-
-#     if len(res) < 2:
-#         rf_cntr, rf_size = np.nan, np.nan
-#     else:
-#         rf_size_list = []
-#         for i in range(int(len(res)/ 2)):
-#             rf_cntr = res[i]
-
-#             rf_size = cv2.contourArea(rf_cntr.astype(np.float32))
-#             rf_size_list.append(rf_size)
-            
-#         largest = np.argmax(rf_size_list)
-#         rf_cntr = res[largest]
-#         rf_size = rf_size_list[largest]
-
-#     if (rf_cntr[0] != rf_cntr[-1]).any():
-#         rf_cntr = np.vstack([rf_cntr, rf_cntr[0]])
-        
-#     return pd.Series([rf_cntr, rf_size])
 
 def gaussian_fit(rf):
     
@@ -208,37 +143,6 @@ def gaussian_fit(rf):
 
     return g(X, Y).T
 
-# def quality_index(x, y):
-    
-#     def norm(x):
-#         return (x - x.min()) / (x.max() - x.min())
-    
-#     x = norm(x.ravel())
-#     y = norm(y.ravel())
-    
-#     n = len(x)
-    
-#     mx = np.mean(x)
-#     my = np.mean(y)
-    
-#     varx = np.var(x)
-#     vary = np.var(y)
-
-#     stdx = np.sqrt(varx)
-#     stdy = np.sqrt(vary)
-    
-#     varxy = np.sum((x-mx) * (y-my)) / (n-1)
-    
-#     loss_corr = varxy / (stdx * stdy)
-    
-#     m_dtt = 2 * mx * my / (mx **2 + my ** 2)
-#     v_dtt = 2 * stdx * stdy / (varx + vary)
-    
-#     q = loss_corr * m_dtt * v_dtt
-    
-#     return q, (loss_corr, m_dtt, v_dtt)
-
-    
 def get_irregular_index(cnts):
     irregular_index = []
     

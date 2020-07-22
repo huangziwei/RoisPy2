@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 from matplotlib_scalebar.scalebar import ScaleBar
 
 from ._utils import *
-# from ._sta import *
+from ._sta import *
 from ._visualize import _plot_rfs
 
 
@@ -60,9 +60,9 @@ class ROIs:
             self.flip_rf = tmp_data['flip_rf']
 
             try:
-                self.df_sta = tmp_data['df_sta']
+                self.df_rf = tmp_data['df_rf']
             except:
-                self.df_sta = None
+                self.df_rf = None
 
             try:
                 # self.df_pairs_50 = tmp_data['df_pairs_50']
@@ -91,14 +91,17 @@ class ROIs:
             soma_chirp_h5_path = self.data_paths['soma_chirp_h5_path'] 
             soma_lchirp_h5_path = self.data_paths['soma_lchirp_h5_path']
 
-            headerfile = self.data_paths['headerfile']
+            try:
+                headerfile = self.data_paths['headerfile']
 
-            with open(self.data_paths['headerfile']) as f:
-                setup_id = int([line for line in f.readlines() if 'string_setupID' in line][0].strip('\n').split('=')[-1])
+                with open(self.data_paths['headerfile']) as f:
+                    setup_id = int([line for line in f.readlines() if 'string_setupID' in line][0].strip('\n').split('=')[-1])
 
-            if setup_id == 2:
-                self.flip_rf = True
-            else:
+                if setup_id == 2:
+                    self.flip_rf = True
+                else:
+                    self.flip_rf = False
+            except:
                 self.flip_rf = False
 
             logging.info('  loading stack.h5\n')
@@ -157,8 +160,10 @@ class ROIs:
             
             if 'Line_Stack_warped' in self.data_stack.keys():
                 self.stack_shape = self.data_stack['Line_Stack_warped'].shape
-            else:
+            elif 'Line_stack_warped' in self.data_stack.keys():
                 self.stack_shape = self.data_stack['Line_stack_warped'].shape
+            else:
+                self.stack_shape = self.data_stack['wDataCh0'].shape
             self.linestack = get_linestack(self.df_paths, self.stack_shape)
 
     def re_calculate_morphology(self):
@@ -185,7 +190,7 @@ class ROIs:
             self.stack_shape = self.data_stack['Line_stack_warped'].shape
         self.linestack = get_linestack(self.df_paths, self.stack_shape)
 
-    def save_pickle(self, save_df_sta=True, save_df_pairs=True, save_df_cntr=True):
+    def save_pickle(self, save_df_rf=True, save_df_pairs=True, save_df_cntr=True):
         d = {
             'data_paths': self.data_paths,
             'data_stack': self.data_stack,
@@ -201,8 +206,8 @@ class ROIs:
             'df_data': self.df_data,
             'flip_rf': self.flip_rf,
         }
-        if save_df_sta:
-            d.update({'df_sta': self.df_sta})
+        if save_df_rf:
+            d.update({'df_rf': self.df_rf})
         if save_df_pairs:
             # d.update({'df_pairs_50': self.df_pairs_50})
             # d.update({'df_pairs_55': self.df_pairs_55})
@@ -294,8 +299,8 @@ class ROIs:
                 rec_id_dict[idx] = rec_id
                 roi_id_dict[idx] = roi_id
                 
-                rf_s_dict[idx] = d['STRF_SVD_Space0'][:, :, roi_id-1]
-                rf_t_dict[idx] = d['STRF_SVD_Time0'][:, roi_id-1]                  
+#                 rf_s_dict[idx] = d['STRF_SVD_Space0'][:, :, roi_id-1]
+#                 rf_t_dict[idx] = d['STRF_SVD_Time0'][:, roi_id-1]                  
 
                 Triggervalues_noise_dict[idx] = d['Triggervalues']
                 Triggertimes_noise_dict[idx] = d['Triggertimes']
@@ -329,8 +334,8 @@ class ROIs:
             rec_id_dict[0] = 0
             roi_id_dict[0] = 0
 
-            rf_s_dict[0] = s_n['STRF_SVD_Space0'][:, :, 0]
-            rf_t_dict[0] = s_n['STRF_SVD_Time0'][:, 0]      
+#             rf_s_dict[0] = s_n['STRF_SVD_Space0'][:, :, 0]
+#             rf_t_dict[0] = s_n['STRF_SVD_Time0'][:, 0]      
             # if 'NoiseArray3D' in d.keys():
                 # NoiseArray3D_dict[0] = d['NoiseArray3D']
 
@@ -346,10 +351,10 @@ class ROIs:
             rf_s_dict[0] = np.random.randn(15,20)
             rf_t_dict[0] = np.random.randn(49)
 
-            Triggervalues_noise_dict[0] = np.random.randn(1500)
-            Triggertimes_noise_dict[0] = np.linspace(0, 300, 10084)
-            Tracetimes0_noise_dict[0] = np.linspace(0, 300, 10084)
-            Traces0_raw_noise_dict[0] = np.random.randn(10084)
+            Triggervalues_noise_dict[0] = Triggervalues_noise_dict[1] 
+            Triggertimes_noise_dict[0] = Triggertimes_noise_dict[1]
+            Tracetimes0_noise_dict[0] = Tracetimes0_noise_dict[1]
+            Traces0_raw_noise_dict[0] = np.random.randn(len(Traces0_raw_noise_dict[1]))
             # Traces0_znorm_noise_dict[0] = np.random.randn(10084)   
         
         soma_chirp_h5_path = [self.data_paths[i] for i in self.data_paths if 'soma_chirp' in i][0]
@@ -452,7 +457,7 @@ class ROIs:
                 d_rel_cy, d_rel_cx, _ = rel_position_um(self.data_stack, d) / self.pixel_sizes_stack[0]
                 d_stack_cx, d_stack_cy = int(linestack_xy.shape[0]/2+d_rel_cx), int(linestack_xy.shape[0]/2+d_rel_cy) 
             
-            padding = int(max(d_rec_rot.shape))
+            padding = int(max(d_rec_rot.shape) * 1.2)
             # padding = int(max(d_rec_rot.shape) * 1.2)
 
             crop_x0, crop_x1 = np.maximum(0, d_stack_cx-padding), np.minimum(d_stack_cx+padding, linestack_xy.shape[0]-1)
@@ -551,11 +556,11 @@ class ROIs:
                     os.makedirs(save_to)
 
                 plt.savefig(save_to + '{}-{}-{}.png'.format( self.expdate, self.expnum, dname))
-                plt.savefig(save_to + '{}-{}-{}.pdf'.format( self.expdate, self.expnum, dname))
+#                 plt.savefig(save_to + '{}-{}-{}.pdf'.format( self.expdate, self.expnum, dname))
 
         self.df_rois = df_rois
 
-    def finetune(self, rec_id, offset=[0,0], pad_more=0, angle_adjust=0, confirm=False, savefig=False, 
+    def finetune(self, rec_id, offset=[0,0], pad_more=0, angle_adjust=0, confirm=False, savefig=False, savepdf=False,
         save_to='../output/rois_on_trace/'):
 
         import matplotlib as mpl
@@ -684,6 +689,11 @@ class ROIs:
 
         if savefig:
             plt.savefig(save_to + '{}-{}-{}.png'.format( self.expdate, self.expnum, dname))
+            
+        if savepdf:
+            plt.savefig(save_to + '{}-{}-{}.pdf'.format( self.expdate, self.expnum, dname))
+
+
 
         
         if not confirm:
@@ -763,14 +773,17 @@ class ROIs:
                     lambda x: np.array(x).astype(int)
                     ))
 
+        self.df_rois = self.df_rois.assign(
+                num_branches_to_soma=self.df_rois.branches_to_soma.apply(len))
+
         # # get df_rois_sub
         df_rois_sub = self.df_rois[['recording_id', 'roi_id', 'recording_center',
-                                         'roi_pos', 'dendritic_distance_to_soma',
-                                         'euclidean_distance_to_soma', 'euclidean_distance_to_density_center' , 'branches_to_soma']]
+                                         'roi_pos', 'roi_pos_stack', 'dendritic_distance_to_soma',
+                                         'euclidean_distance_to_soma', 'euclidean_distance_to_density_center' , 'branches_to_soma', 'num_branches_to_soma']]
         (stack_soma_cx, stack_soma_cy, stack_soma_cz) = self.soma / self.pixel_sizes_stack
         df_soma = pd.DataFrame(columns=(df_rois_sub.columns))
                         #rec_id, roi_id, [recording_center],             'soma_pos',        'dd2soma', 'ed2soma', 'ed2dc', 'branch_to_soma'
-        df_soma.loc[0] = [0,     0,      [stack_soma_cx, stack_soma_cy], self.soma.tolist(), 0,        0,         get_euclidean_distance_to_one_point(self.soma[:2], self.density_center),       0]
+        df_soma.loc[0] = [0,     0,      [stack_soma_cx, stack_soma_cy], self.soma.tolist(), (np.round(self.soma / self.pixel_sizes_stack).astype(int)).tolist(), 0,        0,         get_euclidean_distance_to_one_point(self.soma[:2], self.density_center), 0, 0]
 
         self.df_rois_sub = pd.concat([df_soma, df_rois_sub])
         self.df_data = self._get_df_data()
@@ -778,18 +791,10 @@ class ROIs:
         # return self.df_data
         
 
-    def get_df_sta(self, rf_pixel_size=30, df=7, num_iters=0, lambd=0.05, verbal=0):
+    def get_df_rf(self, rf_pixel_size=30, df=[7,9,7], lambd=0.015):
         
         logging.info('  Calculating RF.')
 
-        # def upsample_rf(rf, rf_pixel_size, stack_pixel_size):
-        #     scale_factor = rf_pixel_size/stack_pixel_size
-        #     return sp.misc.imresize(rf, size=scale_factor, interp='bicubic', mode='F')
-
-#         def upsample_rf(rf, rf_pixel_size, stack_pixel_size):
-#             scale_factor = rf_pixel_size/stack_pixel_size
-#             return scipy.ndimage.zoom(rf,  scale_factor, order=3)
-        
         def upsample_rf(rf, rf_pixel_size, stack_pixel_size):
             from skimage.transform import resize
             scale_factor = rf_pixel_size/stack_pixel_size
@@ -801,9 +806,9 @@ class ROIs:
         noise_columns = ['rec_id', 'roi_id', 'Tracetimes0_noise',
                'Triggertimes_noise','Traces0_raw_noise']
 
-        df_sta = pd.DataFrame()
-        df_sta['rec_id'] = self.df_data['rec_id']
-        df_sta['roi_id'] = self.df_data['roi_id']
+        df_rf = pd.DataFrame()
+        df_rf['rec_id'] = self.df_data['rec_id']
+        df_rf['roi_id'] = self.df_data['roi_id']
 
         # testing
         df_data = self.df_data.copy()
@@ -814,45 +819,43 @@ class ROIs:
             logging.info('  RF data acquired from Setup 2: need to be flipped.\n')
 
             rf_opt = df_data[noise_columns].apply(
-                lambda x: get_sta(*x, stimulus=self.stimulus_noise, df=df, num_iters=num_iters, lambd=lambd, verbal=verbal), axis=1)
-            df_sta['w'] = rf_opt.apply(lambda x:x[2])
-            df_sta['sRF'] = rf_opt.apply(lambda x:np.fliplr(x[0]))
-            df_sta['tRF'] = rf_opt.apply(lambda x:x[1])
+                lambda x: get_rf(*x, stimulus=self.stimulus_noise, df=df, lambd=lambd), axis=1)
+            df_rf['w'] = rf_opt.apply(lambda x:x[2])
+            df_rf['sRF'] = rf_opt.apply(lambda x:np.fliplr(x[0]))
+            df_rf['tRF'] = rf_opt.apply(lambda x:x[1])
         
         else:
             logging.info('  RF data acquired from Setup 3.')
             
             rf_opt = df_data[noise_columns].apply(
-                lambda x: get_sta(*x, stimulus=self.stimulus_noise, df=df, num_iters=num_iters, lambd=lambd, verbal=verbal), axis=1)
-            df_sta['w'] = rf_opt.apply(lambda x:x[2])
-            df_sta['sRF'] = rf_opt.apply(lambda x:x[0])
-            df_sta['tRF'] = rf_opt.apply(lambda x:x[1])
+                lambda x: get_rf(*x, stimulus=self.stimulus_noise, df=df, lambd=lambd), axis=1)
+            df_rf['w'] = rf_opt.apply(lambda x:x[2])
+            df_rf['sRF'] = rf_opt.apply(lambda x:x[0])
+            df_rf['tRF'] = rf_opt.apply(lambda x:x[1])
 
 
         # upsampled RF to match the real length.
 
-        df_sta['sRF_upsampled'] = df_sta['sRF'].apply(
+        df_rf['sRF_upsampled'] = df_rf['sRF'].apply(
             lambda x: upsample_rf(x, rf_pixel_size, self.pixel_sizes_stack[0]))
 
-        self.df_sta = df_sta.sort_index()
+        self.df_rf = df_rf.sort_index()
 
 
-    def draw_contours(self, rf_pixel_size=30, rf_shape=[15,20]):
+    def draw_contours(self, rf_pixel_size=30, rf_shape=[15,20], levels=[60, 65, 70]):
         
         import itertools
 
-        df_sta = self.df_sta.copy()
+        df_rf = self.df_rf.copy()
         df_rois = self.df_rois_sub
         df_cntr = pd.DataFrame()
-        df_cntr[['rec_id', 'roi_id']] = df_sta[['rec_id', 'roi_id']]
+        df_cntr[['rec_id', 'roi_id']] = df_rf[['rec_id', 'roi_id']]
         
-        # levels = np.linspace(0, 1, 41)[::2][10:-6]
-        # levels = np.arange(0.6, 0.72, 0.025)
-        levels = np.arange(55, 75, 5)/ 100
+        levels = np.array(levels)/100
         labels = [['sRF_upsampled_cntr_{0}'.format(int(lev * 100)), 'sRF_upsampled_cntr_size_{0}'.format(int(lev * 100)) ] for lev in levels]
         labels = list(itertools.chain(*labels))
         
-        df_cntr[labels] = df_sta['sRF_upsampled'].apply(lambda x: get_contour(x, 
+        df_cntr[labels] = df_rf['sRF_upsampled'].apply(lambda x: get_contour(x, levels, 
                                                     self.pixel_sizes_stack[0], 
                                                     rf_pixel_size))
 
@@ -862,16 +865,14 @@ class ROIs:
             lambda x: (rfcenter-np.array(x) * self.pixel_sizes_stack[0]).astype(int)
         )
         
-        # for lev in np.arange(55, 75, 5):
-        for lev in np.arange(60, 75, 5):
+        for lev in (levels*100).astype(int):
             
             print('Finished threshold {}...'.format(lev))
             
             # get quality
-            df_cntr['cntr_irregularity_{}'.format(lev)] = df_cntr['sRF_upsampled_cntr_{}'.format(lev)].apply(lambda x: get_irregular_index(x))
+            # df_cntr['cntr_irregularity_{}'.format(lev)] = df_cntr['sRF_upsampled_cntr_{}'.format(lev)].apply(lambda x: get_irregular_index(x))
             df_cntr['cntr_counts_{}'.format(lev)] = df_cntr['sRF_upsampled_cntr_{}'.format(lev)].apply(lambda x: len(x))
-            df_cntr['cntr_quality_{}'.format(lev)] = np.logical_and(df_cntr['cntr_counts_{}'.format(lev)] < 2, 
-                                                                    df_cntr['cntr_irregularity_{}'.format(lev)] < 0.1)
+            df_cntr['cntr_quality_{}'.format(lev)] = df_cntr['cntr_counts_{}'.format(lev)] == 1
             
             # put cntr on morphology
             res = []
@@ -918,12 +919,10 @@ class ROIs:
             df_cntr['distance_from_RF_center_to_ROI_calibrated_with_average_offset_{}'.format(lev)] = df_cntr['cntrs_offset_calibrate_to_rois_{}'.format(lev)][df_cntr['cntrs_offset_calibrate_to_rois_{}'.format(lev)].notnull()].apply(lambda x: np.mean([np.sqrt(np.sum(y**2)) for y in x]))
             
         df_cntr['cntr_quality'] = df_cntr[[
-                      'cntr_quality_60', 
-                      'cntr_quality_65', 
-                      'cntr_quality_70'
-                      ]].all(1)
-
+            'cntr_quality_{}'.format(int(lev*100)) for lev in levels]].all(1)
+        
         self.df_cntr = df_cntr
+        self.levels = levels
 
     def reset_cntr_quality(self):
         """
@@ -959,7 +958,7 @@ class ROIs:
             
             # cntr_quality = self.df_cntr['cntr_quality_{}'.format(lev)].loc[1:] # exclude soma
             df_rois = self.df_rois_sub.loc[1:].loc[cntr_quality]
-            df_sta = self.df_sta.loc[1:].loc[cntr_quality]
+            df_rf = self.df_rf.loc[1:].loc[cntr_quality]
             df_paths = self.df_paths
             df_cntr = self.df_cntr
 
@@ -968,7 +967,7 @@ class ROIs:
             total_num_pairs = np.sum(np.arange(len(df_rois)))
             print('  {} pairs of ROIs are being processing.\n'.format(total_num_pairs))
 
-            pair_ids = combinations(df_sta.index, 2)
+            pair_ids = combinations(df_rois.index, 2)
 
             column_labels = ('pair_id', 'euclidian_distance_between_rois', 'dendritic_distance_between_rois',
                              'euclidian_distance_to_soma_sum', 'dendritic_distance_to_soma_sum',
@@ -1073,7 +1072,7 @@ class ROIs:
     def save_offset_df(self, roi_id, exptype):
         
         
-        out0 = self.df_sta.loc[roi_id][['rec_id','roi_id', 'sRF_upsampled_size', 'distance_from_RF_center_to_ROI_without_calibration', 'distance_from_RF_center_to_soma_without_calibration', 'distance_from_RF_center_to_ROI_calibrated_with_average_offset', 'distance_from_RF_center_to_soma_calibrated_with_average_offset']]
+        out0 = self.df_rf.loc[roi_id][['rec_id','roi_id', 'sRF_upsampled_size', 'distance_from_RF_center_to_ROI_without_calibration', 'distance_from_RF_center_to_soma_without_calibration', 'distance_from_RF_center_to_ROI_calibrated_with_average_offset', 'distance_from_RF_center_to_soma_calibrated_with_average_offset']]
         out1 = self.df_rois.loc[roi_id][['dendritic_distance_to_soma', 'euclidean_distance_to_soma']]
         
         o = pd.concat([out0, out1], axis=1)
@@ -1085,7 +1084,7 @@ class ROIs:
     ## Plotting methods ##
     ######################
 
-    def plot_rois(self, roi_max_distance=300, plot_rois=True, plot_morph=True, plot_stratification=True):
+    def plot_rois(self, roi_max_distance=300, plot_rois=True, plot_morph=True, plot_stratification=False):
 
         def get_sumline(self):
     
@@ -1107,7 +1106,7 @@ class ROIs:
             
             return new_sum, layerON, layerOFF
 
-        sumLine, layerON, layerOFF = get_sumline(self)
+        # sumLine, layerON, layerOFF = get_sumline(self)
 
         fig = plt.figure(figsize=(8.27,8.27))
 
@@ -1117,10 +1116,11 @@ class ROIs:
         ax4 = plt.subplot2grid((4,4), (3,0), rowspan=1, colspan=1)
         
         soma_pos = self.soma
-        dendrites = self.df_paths[self.df_paths.type == 3]   
-        
+        # dendrites = self.df_paths[self.df_paths.type == 3]   
+        dendrites = self.df_paths
+
         maxlim0, _, maxlim1 = self.stack_shape * self.pixel_sizes_stack
-        num_layers = len(sumLine)
+        # num_layers = len(sumLine)
 
         if plot_morph:
 
@@ -1154,7 +1154,7 @@ class ROIs:
                         cmap=plt.cm.viridis, vmin=0, vmax=roi_max_distance, zorder=10)
             
             
-            ax3.plot(sumLine * 30, np.linspace(0, maxlim1 ,num_layers), color='black')
+            # ax3.plot(sumLine * 30, np.linspace(0, maxlim1 ,num_layers), color='black')
             
         if plot_stratification:
 
@@ -1202,7 +1202,7 @@ class ROIs:
 
     def plot_all_rfs(self, kind='sRF_upsampled'):
 
-        fig_list = _plot_rfs(self.df_sta, self.df_cntr, kind=kind)
+        fig_list = _plot_rfs(self.df_rf, self.df_cntr, kind=kind)
 
         return fig_list
 
@@ -1212,20 +1212,21 @@ class ROIs:
 
 
         soma_pos = self.soma
-        dendrites = self.df_paths[self.df_paths.type == 3]   
+        # dendrites = self.df_paths[self.df_paths.type == 3]   
+        dendrites = self.df_paths
+        levels = self.levels
 
         rois_pos = np.vstack(self.df_rois_sub.roi_pos)
         rois_dis = self.df_rois_sub.dendritic_distance_to_soma.values
 
         colors = np.vstack(plt.cm.viridis((rois_dis / roi_max_distance * 255).astype(int)))[:, :3]
 
-        fig, ax = plt.subplots(3,3, figsize=(8.27,11.69))
+        fig, ax = plt.subplots(len(levels),3, figsize=(8.27,11.69))
         ax = ax.flatten()
 
         quality = self.df_cntr['cntr_quality'].values
 
-        # for ilev, lev in enumerate(np.arange(55, 75, 5)):
-        for ilev, lev in enumerate(np.arange(60, 75, 5)):
+        for ilev, lev in enumerate(np.array(levels*100).astype(int)):
             
             cntrs_without_calibration = self.df_cntr['sRF_upsampled_tree_cntr_{}'.format(lev)]
             cntrs_calibrate_to_soma = self.df_cntr['cntrs_calibrate_to_soma_{}'.format(lev)]
@@ -1240,8 +1241,6 @@ class ROIs:
                           'Adjusted by soma offset(if exists)',
                           'Adjusted by ROIs mean offset']
 
-            # quality = self.df_cntr['cntr_quality'].values
-            
             s, e = [ilev*3, ilev*3+3]
             
             for ii, im in enumerate(ax[s:e]):
@@ -1260,14 +1259,6 @@ class ROIs:
                 
                 for i, cnt in enumerate(cntrs):
                 
-                    # quality = self.df_cntr[['cntr_quality_50', 
-                    #           'cntr_quality_55', 
-                    #           'cntr_quality_60', 
-                    #           'cntr_quality_65', 
-                    #           'cntr_quality_70']].loc[i].values
-
-                
-                    # if quality60 == False:
                     if quality[i] == False: 
                         continue
 
@@ -1292,7 +1283,7 @@ class ROIs:
 
         # plt.autoscale(True)
         # plt.suptitle('contour thresholds: 0.55, 0.6, 0.65, 0.7')
-        plt.suptitle('contour thresholds: 0.6, 0.65, 0.7')
+        plt.suptitle('contour thresholds')
         
         return fig, ax
 
@@ -1484,14 +1475,6 @@ class ROIs:
          self.df_rois_sub.dendritic_distance_to_soma,
          self.df_rois_sub.euclidean_distance_to_density_center,
          
-         # self.df_cntr['sRF_asd_upsampled_cntr_size_50'].apply(lambda x: np.sum(x)),
-         # self.df_cntr['cntrs_offset_calibrate_to_rois_50'].apply(lambda x: np.sqrt(np.sum(x**2))).apply(lambda x: np.nan_to_num(x)), 
-         # self.df_cntr['cntr_quality_50'].astype(int),
-                               
-         # self.df_cntr['sRF_asd_upsampled_cntr_size_55'].apply(lambda x: np.sum(x)),
-         # self.df_cntr['cntrs_offset_calibrate_to_rois_55'].apply(lambda x: np.sqrt(np.sum(x**2))).apply(lambda x: np.nan_to_num(x)), 
-         # self.df_cntr['cntr_quality_55'].astype(int),
-                               
          self.df_cntr['sRF_upsampled_cntr_size_60'].apply(lambda x: np.sum(x)),
          self.df_cntr['cntrs_offset_calibrate_to_rois_60'].apply(lambda x: np.sqrt(np.sum(x**2))).apply(lambda x: np.nan_to_num(x)), 
          self.df_cntr['cntr_quality_60'].astype(int),

@@ -2,26 +2,26 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib_scalebar.scalebar import ScaleBar
 
-# def _plot_rfs(df_sta, rftype, cntrtype):
+# def _plot_rfs(df_rf, rftype, cntrtype):
     
-#     # df = df_sta[['rec_id', 'roi_id', rftype, cntrtype]]
+#     # df = df_rf[['rec_id', 'roi_id', rftype, cntrtype]]
     
-#     rec_ids = df_sta['rec_id']
-#     roi_ids = df_sta['roi_id']
-#     rfs = df_sta['{}'.format(rftype)]
-#     rf_quality = df_sta['rf_quality']
-#     # rf_quality_index = df_sta['rf_quality_index']
+#     rec_ids = df_rf['rec_id']
+#     roi_ids = df_rf['roi_id']
+#     rfs = df_rf['{}'.format(rftype)]
+#     rf_quality = df_rf['rf_quality']
+#     # rf_quality_index = df_rf['rf_quality_index']
     
 
 #     if 'upsampled' in rftype:
-#         rf_cntr = df_sta['{}'.format(cntrtype[:-9] + 'real_cntr')]
-#         rf_sizes = df_sta['{}_size'.format(rftype)]
+#         rf_cntr = df_rf['{}'.format(cntrtype[:-9] + 'real_cntr')]
+#         rf_sizes = df_rf['{}_size'.format(rftype)]
 #     else:
-#         rf_cntr = df_sta['{}'.format(cntrtype)]
-#         rf_sizes = df_sta['{}_size'.format(rftype)]
+#         rf_cntr = df_rf['{}'.format(cntrtype)]
+#         rf_sizes = df_rf['{}_size'.format(rftype)]
     
-#     num_full_pages = len(df_sta)//32
-#     remainder = len(df_sta) % 32
+#     num_full_pages = len(df_rf)//32
+#     remainder = len(df_rf) % 32
 #     if remainder > 0:
 #         num_pages = num_full_pages + 1
 #     else:
@@ -75,19 +75,19 @@ from matplotlib_scalebar.scalebar import ScaleBar
 #     return fig_list
 
 
-# def _plot_rfs(df_sta):
+# def _plot_rfs(df_rf):
     
-#     rec_ids = df_sta['rec_id']
-#     roi_ids = df_sta['roi_id']
+#     rec_ids = df_rf['rec_id']
+#     roi_ids = df_rf['roi_id']
     
-#     rfs=  df_sta['sRF_asd_upsampled']
-#     rf_cntrs = df_sta['sRF_asd_upsampled_cntr']
-#     rf_sizes = df_sta['sRF_asd_upsampled_size']
+#     rfs=  df_rf['sRF_asd_upsampled']
+#     rf_cntrs = df_rf['sRF_asd_upsampled_cntr']
+#     rf_sizes = df_rf['sRF_asd_upsampled_size']
 
-#     highlight = np.where(~df_sta['cntr_quality'])[0]
+#     highlight = np.where(~df_rf['cntr_quality'])[0]
     
-#     num_full_pages = len(df_sta)//32
-#     remainder = len(df_sta) % 32
+#     num_full_pages = len(df_rf)//32
+#     remainder = len(df_rf) % 32
 #     if remainder > 0:
 #         num_pages = num_full_pages + 1
 #     else:
@@ -144,19 +144,19 @@ from matplotlib_scalebar.scalebar import ScaleBar
 
 #     return fig_list   
 
-# def _plot_rfs(df_sta):
+# def _plot_rfs(df_rf):
     
-#     rec_ids = df_sta['rec_id']
-#     roi_ids = df_sta['roi_id']
+#     rec_ids = df_rf['rec_id']
+#     roi_ids = df_rf['roi_id']
     
-#     rfs=  df_sta['sRF_asd_upsampled']
-#     rf_cntrs = df_sta['sRF_asd_upsampled_cntr']
-#     rf_sizes = df_sta['sRF_asd_upsampled_size']
+#     rfs=  df_rf['sRF_asd_upsampled']
+#     rf_cntrs = df_rf['sRF_asd_upsampled_cntr']
+#     rf_sizes = df_rf['sRF_asd_upsampled_size']
 
-#     highlight = np.where(~df_sta['cntr_quality'])[0]
+#     highlight = np.where(~df_rf['cntr_quality'])[0]
     
-#     num_full_pages = len(df_sta)//32
-#     remainder = len(df_sta) % 32
+#     num_full_pages = len(df_rf)//32
+#     remainder = len(df_rf) % 32
 #     if remainder > 0:
 #         num_pages = num_full_pages + 1
 #     else:
@@ -213,22 +213,22 @@ from matplotlib_scalebar.scalebar import ScaleBar
 
 #     return fig_list   
 
-def _plot_rfs(df_sta, df_cntr, kind='sRF_upsampled'):
+def _plot_rfs(df_rf, df_cntr, kind='sRF_upsampled'):
     
     def rescale_data(data):
         return (data - data.min()) / (data.max() - data.min())
     
-    rec_ids = df_sta['rec_id']
-    roi_ids = df_sta['roi_id']
+    rec_ids = df_rf['rec_id']
+    roi_ids = df_rf['roi_id']
     
-    rfs = df_sta[kind]
+    rfs = df_rf[kind]
     
     num_row = 6
     num_col = 4
     num_rf_each_page = num_row * num_col
     
-    num_full_pages = len(df_sta)//num_rf_each_page
-    remainder = len(df_sta) % num_rf_each_page
+    num_full_pages = len(df_rf)//num_rf_each_page
+    remainder = len(df_rf) % num_rf_each_page
     if remainder > 0:
         num_pages = num_full_pages + 1
     else:
@@ -240,6 +240,7 @@ def _plot_rfs(df_sta, df_cntr, kind='sRF_upsampled'):
     # levels=np.linspace(0, 1, 41)[::2][10:-6]
     # levels = np.arange(55, 75, 5)/100
     levels = np.arange(60, 75, 5)/100
+#     levels = [65 / 100]
 
     quality = df_cntr['cntr_quality']
 
